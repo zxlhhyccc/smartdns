@@ -53,12 +53,26 @@
  function smartdnsRenderStatus(res) {
 	 var renderHTML = "";
 	 var isRunning = res[0];
- 
+
+	 var autoSetDnsmasq = uci.get_first('smartdns', 'smartdns', 'auto_set_dnsmasq');
+	 var smartdnsPort = uci.get_first('smartdns', 'smartdns', 'port');
+	 var dnsmasqServer = uci.get_first('dhcp', 'dnsmasq', 'server');
+	 uci.unload('dhcp');
+
 	 if (isRunning) {
 		 renderHTML += "<span style=\"color:green;font-weight:bold\">SmartDNS - " + _("RUNNING") + "</span>";
 	 } else {
 		 renderHTML += "<span style=\"color:red;font-weight:bold\">SmartDNS - " + _("NOT RUNNING") + "</span>";
 		 return renderHTML;
+	 }
+ 
+	 if (autoSetDnsmasq === '1' && smartdnsPort != '53') {
+		 var matchLine = "127.0.0.1#" + smartdnsPort;
+		 var dnsmasqServer = uci.get_first('dhcp', 'dnsmasq', 'server') || "";
+ 
+		 if (dnsmasqServer.indexOf(matchLine) < 0) {
+			 renderHTML += "<br /><span style=\"color:red;font-weight:bold\">" + _("Dnsmasq Forwared To Smartdns Failure") + "</span>";
+		 }
 	 }
  
 	 return renderHTML;
@@ -67,8 +81,8 @@
  return view.extend({
 	 load: function () {
 		 return Promise.all([
+			 uci.load('dhcp'),
 			 uci.load('smartdns'),
-			 uci.load('dhcp')
 		 ]);
 	 },
 	 render: function (stats) {
@@ -122,8 +136,8 @@
 		 o.rempty = false;
  
 		 // Port;
-		 o = s.taboption("settings", form.Value, "port", _("Local Port"), 
-		 	_("Smartdns local server port, smartdns will be automatically set as main dns when the port is 53."));
+		 o = s.taboption("settings", form.Value, "port", _("Local Port"),
+			 _("Smartdns local server port, smartdns will be automatically set as main dns when the port is 53."));
 		 o.placeholder = 53;
 		 o.default = 53;
 		 o.datatype = "port";
@@ -165,7 +179,7 @@
 		 o = s.taboption("settings", form.Flag, "resolve_local_hostnames", _("Resolve Local Hostnames"), _("Resolve local hostnames by reading Dnsmasq lease file."));
 		 o.rmempty = false;
 		 o.default = o.enabled;
-
+ 
 		 // auto-conf-dnsmasq;
 		 o = s.taboption("settings", form.Flag, "auto_set_dnsmasq", _("Automatically Set Dnsmasq"), _("Automatically set as upstream of dnsmasq when port changes."));
 		 o.rmempty = false;
@@ -195,14 +209,14 @@
  
 		 // rr-ttl-max;
 		 o = s.taboption("settings", form.Value, "rr_ttl_max", _("Domain TTL Max"),
-		 _("Maximum TTL for all domain result."));
+			 _("Maximum TTL for all domain result."));
 		 o.rempty = true;
  
 		 // rr-ttl-reply-max;
 		 o = s.taboption("settings", form.Value, "rr_ttl_reply_max", _("Reply Domain TTL Max"),
-		 _("Reply maximum TTL for all domain result."));
+			 _("Reply maximum TTL for all domain result."));
 		 o.rempty = true;
-		 
+ 
 		 // second dns server;
 		 // Eanble;
 		 o = s.taboption("seconddns", form.Flag, "seconddns_enabled", _("Enable"),
